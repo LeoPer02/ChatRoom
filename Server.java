@@ -82,7 +82,7 @@ public class Server {
         socketChannel.read(buffer);
         if (buffer.limit() == 0) {
             sendError(socketChannel);
-            socketChannel.close();
+            closeSocket(socketChannel);
             return;
         }
 
@@ -107,7 +107,7 @@ public class Server {
                         if(availableNames.get(subCmd[1]) == null){
                             clientName.put(socketChannel, subCmd[1]);
                             availableNames.put(subCmd[1], socketChannel);
-                            CharBuffer msg = CharBuffer.wrap("Hi " + subCmd[1] + "\n");
+                            CharBuffer msg = CharBuffer.wrap("OK\n");
                             socketChannel.write(encoder.encode(msg));
                             socketState.remove(socketChannel);
                             socketState.put(socketChannel, state.OUTSIDE);
@@ -140,7 +140,7 @@ public class Server {
                             clientName.remove(socketChannel);
                             clientName.put(socketChannel, subCmd[1]);
                             availableNames.put(subCmd[1], socketChannel);
-                            CharBuffer msg = CharBuffer.wrap("Hi " + subCmd[1] + "\n");
+                            CharBuffer msg = CharBuffer.wrap("OK\n");
                             socketChannel.write(encoder.encode(msg));
                         }else{
                             sendError(socketChannel);
@@ -161,22 +161,46 @@ public class Server {
                             r = Integer.parseInt(subCmd[1]);
                         } catch (NumberFormatException e) {
                             sendError(socketChannel);
-                            throw new RuntimeException(e);
+                            return;
                         }
                         addToRoom(socketChannel, r);
                         socketState.remove(socketChannel);
                         socketState.put(socketChannel, state.INSIDE);
+                        socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
                         break;
                     default:
-                        CharBuffer msg = CharBuffer.wrap("Erro estupido");
-                        socketChannel.write(encoder.encode(msg));
+                        sendError(socketChannel);
                         break;
                 }
                 break;
             case INSIDE:
+                // Allowed Commands
                 switch (subCmd[0]){
                     case "/bye":
+                        removeFromRoom(socketChannel);
                         closeSocket(socketChannel);
+                        break;
+                    case "/nick":
+                        String name = clientName.get(socketChannel);
+                        if(name.equals(subCmd[1])){
+                            CharBuffer msg = CharBuffer.wrap("You already are logged as: " + subCmd[1] + "\n");
+                            socketChannel.write(encoder.encode(msg));
+                        }else if (availableNames.get(subCmd[1]) == null) {
+                            availableNames.remove(name);
+                            clientName.remove(socketChannel);
+                            clientName.put(socketChannel, subCmd[1]);
+                            availableNames.put(subCmd[1], socketChannel);
+                            warnChangeName(socketChannel, name, subCmd[1]);
+
+                        }else{
+                            sendError(socketChannel);
+                            CharBuffer msg = CharBuffer.wrap("Name: " + subCmd[1] + " already in use\n");
+                            socketChannel.write(encoder.encode(msg));
+                        }
+                        break;
+                    case "/leave":
+                        removeFromRoom(socketChannel);
+                        break;
                 }
                 break;
             default:
@@ -216,28 +240,37 @@ public class Server {
             }
         }
         socketState.remove(socketChannel);
-        socketChannel.write(encoder.encode(CharBuffer.wrap("Closing Connection...\n")));
+        socketChannel.write(encoder.encode(CharBuffer.wrap("BYE\n")));
         socketChannel.close();
     }
 
     public static void removeFromRoom(SocketChannel socketChannel) throws IOException {
         // Catch null in case the user wasn't in a room
         try {
+            //System.out.println("Getting in Removal " + clientRoom.toString());
             int r = clientRoom.get(socketChannel);
+            //System.out.println("Room: " + r);
         }catch (NullPointerException e){
             return;
         }
         String name = clientName.get(socketChannel);
-            clientRoom.remove(socketChannel);
-            for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
-                Iterator<SocketChannel> it = e.getValue().iterator();
-                while (it.hasNext()) {
-                    if (it.next() == socketChannel) it.remove();
-                    else {
-                        it.next().write(encoder.encode(CharBuffer.wrap("LEFT " + name+"\n")));
-                    }
+        clientRoom.remove(socketChannel);
+        for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
+            Iterator<SocketChannel> it = e.getValue().iterator();
+            while (it.hasNext()) {
+                SocketChannel s = it.next();
+                if(s == socketChannel){
+                    socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
+                    it.remove();
+                }else{
+                    s.write(encoder.encode(CharBuffer.wrap("LEFT " + name+"\n")));
                 }
             }
+        }
+        socketState.remove(socketChannel);
+        socketState.put(socketChannel, state.OUTSIDE);
+
+        //System.out.println("After removing: " + room.toString());
     }
 
     public static void addToRoom(SocketChannel socketChannel, int r) throws IOException {
@@ -249,10 +282,30 @@ public class Server {
             }
         }
         room.computeIfAbsent(r, k -> new ArrayList<>()).add(socketChannel);
+        clientRoom.put(socketChannel, r);
     }
 
     public static void sendError(SocketChannel socketChannel) throws IOException {
         CharBuffer msg = CharBuffer.wrap("ERROR\n");
         socketChannel.write(encoder.encode(msg));
+    }
+
+    public static void warnChangeName(SocketChannel socketChannel, String OldName, String NewName) throws IOException {
+        try {
+            //System.out.println("Getting in Removal " + clientRoom.toString());
+            int r = clientRoom.get(socketChannel);
+            //System.out.println("Room: " + r);
+        }catch (NullPointerException e){
+            return;
+        }
+        for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
+            Iterator<SocketChannel> it = e.getValue().iterator();
+            while (it.hasNext()) {
+                SocketChannel s = it.next();
+                if(s == socketChannel) s.write(encoder.encode(CharBuffer.wrap("OK\n")));
+                else s.write(encoder.encode(CharBuffer.wrap("NEWNICK " + OldName + " "+ NewName + "\n")));
+            }
+        }
+
     }
 }
