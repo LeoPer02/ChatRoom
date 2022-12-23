@@ -78,6 +78,7 @@ public class ChatClient {
         if(message.length() > 1 && message.charAt(0) == '/' && !Objects.equals(tmp[0], "/nick") && !Objects.equals(tmp[0], "/join") && !Objects.equals(tmp[0], "/leave") && !Objects.equals(tmp[0], "/bye") && !Objects.equals(tmp[0], "/priv")){
             dataOutputStream.writeBytes("/" + message + "\n");
             dataOutputStream.flush();
+            if(Objects.equals(tmp[0], "/bye")) frame.dispose();
         }else{
             dataOutputStream.writeBytes(message + "\n");
             dataOutputStream.flush();
@@ -89,8 +90,8 @@ public class ChatClient {
     public void run() throws IOException {
         // PREENCHER AQUI
         String messageFromServer;
-        while(bufferedReader.readLine() != null) {
-            messageFromServer = bufferedReader.readLine();
+        while((messageFromServer = bufferedReader.readLine()) != null) {
+            //messageFromServer = bufferedReader.readLine();
             printMessage(messageFromServer + '\n');
         }
     }
@@ -104,11 +105,3 @@ public class ChatClient {
     }
 
 }
-/*
-  while(cmd.charAt(cmd.length()-1) != '\n'){
-            buffer.clear();
-            socketChannel.read(buffer);
-            buffer.flip();
-            cmd += decoder.decode(buffer).toString();
-        }
- */

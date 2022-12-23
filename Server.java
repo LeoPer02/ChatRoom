@@ -90,11 +90,17 @@ public class Server {
         state estado = checkState(socketChannel);
         buffer.flip();
         String cmd = decoder.decode(buffer).toString();
-
+        while(cmd.charAt(cmd.length()-1) != '\n'){
+            buffer.clear();
+            socketChannel.read(buffer);
+            buffer.flip();
+            cmd += decoder.decode(buffer).toString();
+        }
         String[] subCmd = cmd.split(" ");
         // Removing \n
         int l = subCmd.length;
-        subCmd[l-1] = subCmd[l-1].substring(0, subCmd[l-1].length() - 1);
+        if(l > 0) subCmd[l-1] = subCmd[l-1].substring(0, subCmd[l-1].length() - 1);
+        else return;
         System.out.println("After: " + Arrays.toString(subCmd));
         System.out.println("Client State: <" + estado + "> " + estado.equals(state.OUTSIDE));
         switch (estado){
@@ -348,7 +354,7 @@ public class Server {
                 while (it.hasNext()) {
                     SocketChannel s = it.next();
                     if (s == socketChannel) s.write(encoder.encode(CharBuffer.wrap("OK\n")));
-                    else s.write(encoder.encode(CharBuffer.wrap("NEWNICK " + OldName + " " + NewName + "\n")));
+                    else s.write(encoder.encode(CharBuffer.wrap(OldName + " mudou de nome para " + NewName + '\n')));
                 }
             }
         }
