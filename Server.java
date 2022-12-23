@@ -24,9 +24,9 @@ public class Server {
 
     public static Map<SocketChannel, String> clientName= new HashMap<>();
     // Necessário para saber que sala o utilizador se encontra
-    public static Map<SocketChannel, Integer> clientRoom = new HashMap<>();
+    public static Map<SocketChannel, String> clientRoom = new HashMap<>();
 
-    public static Map<Integer, List<SocketChannel>> room = new HashMap<>();
+    public static Map<String, List<SocketChannel>> room = new HashMap<>();
     public static Map<String, SocketChannel> availableNames = new HashMap<>();
     public static Map<SocketChannel, state> socketState = new HashMap<>();
     public static void main(String[] args) {
@@ -127,6 +127,23 @@ public class Server {
             // ################ OUTSIDE STATE ###################
             case OUTSIDE:
                 // Allowed Commands '/join' '/nick' '/bye'
+                /*
+                *
+                *
+                *
+                *
+                *  Mudar as salas para Strings (Nomes tipo 'C++', 'Sala_de_Convivio') em vez
+                *  de Integers
+                *
+                *
+                *
+                *
+                *
+                *
+                *
+                *
+                *
+                * */
                 switch (subCmd[0]) {
                     // ---------------- NICK COMMAND -----------------
                     case "/nick":
@@ -155,9 +172,9 @@ public class Server {
                     case "/join":
                         removeFromRoom(socketChannel);
                         // Caso não seja possivel converter para inteiro o nº da sala
-                        int r;
+                        String r;
                         try {
-                            r = Integer.parseInt(subCmd[1]);
+                            r = subCmd[1];
                         } catch (NumberFormatException e) {
                             sendError(socketChannel);
                             return;
@@ -214,9 +231,9 @@ public class Server {
                     case "/join":
                         removeFromRoom(socketChannel);
                         // Caso não seja possivel converter para inteiro o nº da sala
-                        int r;
+                        String r;
                         try {
-                            r = Integer.parseInt(subCmd[1]);
+                            r = subCmd[1];
                         } catch (NumberFormatException e) {
                             sendError(socketChannel);
                             return;
@@ -270,7 +287,7 @@ public class Server {
         // Remove entry Socket -> Room
         clientRoom.remove(socketChannel);
         // Search for Socket in Room and remove it
-        for(Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()){
+        for(Map.Entry<String, List<SocketChannel>> e : room.entrySet()){
                 Iterator<SocketChannel> it = e.getValue().iterator();
                 while (it.hasNext()) {
                     if (it.next() == socketChannel) it.remove();
@@ -283,7 +300,7 @@ public class Server {
 
     public static void removeFromRoom(SocketChannel socketChannel) throws IOException {
         // Catch null in case the user wasn't in a room
-        int r;
+        String r;
         try {
             //System.out.println("Getting in Removal " + clientRoom.toString());
             r = clientRoom.get(socketChannel);
@@ -293,8 +310,8 @@ public class Server {
         }
         String name = clientName.get(socketChannel);
         clientRoom.remove(socketChannel);
-        for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
-            if(e.getKey() == r) {
+        for (Map.Entry<String, List<SocketChannel>> e : room.entrySet()) {
+            if(Objects.equals(e.getKey(), r)) {
                 Iterator<SocketChannel> it = e.getValue().iterator();
                 while (it.hasNext()) {
                     SocketChannel s = it.next();
@@ -313,10 +330,10 @@ public class Server {
         //System.out.println("After removing: " + room.toString());
     }
 
-    public static void addToRoom(SocketChannel socketChannel, int r) throws IOException {
+    public static void addToRoom(SocketChannel socketChannel, String r) throws IOException {
         String name = clientName.get(socketChannel);
-        for(Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()){
-            if(e.getKey() == r) {
+        for(Map.Entry<String, List<SocketChannel>> e : room.entrySet()){
+            if(Objects.equals(e.getKey(), r)) {
                 Iterator<SocketChannel> it = e.getValue().iterator();
                 while (it.hasNext()) {
                     it.next().write(encoder.encode(CharBuffer.wrap("JOINED " + name + "\n")));
@@ -333,7 +350,7 @@ public class Server {
     }
 
     public static void warnChangeName(SocketChannel socketChannel, String OldName, String NewName) throws IOException {
-        int r;
+        String r;
         try {
             //System.out.println("Getting in Removal " + clientRoom.toString());
             r = clientRoom.get(socketChannel);
@@ -341,8 +358,8 @@ public class Server {
         }catch (NullPointerException e){
             return;
         }
-        for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
-            if(e.getKey() == r) {
+        for (Map.Entry<String, List<SocketChannel>> e : room.entrySet()) {
+            if(Objects.equals(e.getKey(), r)) {
                 Iterator<SocketChannel> it = e.getValue().iterator();
                 while (it.hasNext()) {
                     SocketChannel s = it.next();
@@ -360,7 +377,7 @@ public class Server {
             return;
         }
 
-        int r;
+        String r;
         try {
             //System.out.println("Getting in Removal " + clientRoom.toString());
             r = clientRoom.get(socketChannel);
@@ -371,8 +388,8 @@ public class Server {
 
         String name = clientName.get(socketChannel);
 
-        for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
-            if(e.getKey() == r) {
+        for (Map.Entry<String, List<SocketChannel>> e : room.entrySet()) {
+            if(Objects.equals(e.getKey(), r)) {
                 Iterator<SocketChannel> it = e.getValue().iterator();
                 while (it.hasNext()) {
                     SocketChannel s = it.next();
