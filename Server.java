@@ -127,23 +127,6 @@ public class Server {
             // ################ OUTSIDE STATE ###################
             case OUTSIDE:
                 // Allowed Commands '/join' '/nick' '/bye'
-                /*
-                *
-                *
-                *
-                *
-                *  Mudar as salas para Strings (Nomes tipo 'C++', 'Sala_de_Convivio') em vez
-                *  de Integers
-                *
-                *
-                *
-                *
-                *
-                *
-                *
-                *
-                *
-                * */
                 switch (subCmd[0]) {
                     // ---------------- NICK COMMAND -----------------
                     case "/nick":
