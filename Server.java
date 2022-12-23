@@ -393,7 +393,7 @@ public class Server {
                 while (it.hasNext()) {
                     SocketChannel s = it.next();
                     // Caso usemos interface gráfica, retirar o if
-                    if (s != socketChannel) s.write(encoder.encode(CharBuffer.wrap(name + ": " + msg)));
+                    /*if (s != socketChannel)*/ s.write(encoder.encode(CharBuffer.wrap(name + ": " + msg)));
                 }
             }
         }
