@@ -90,6 +90,7 @@ public class Server {
         state estado = checkState(socketChannel);
         buffer.flip();
         String cmd = decoder.decode(buffer).toString();
+
         String[] subCmd = cmd.split(" ");
         // Removing \n
         int l = subCmd.length;
