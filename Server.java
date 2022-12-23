@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.SelectionKey;
@@ -91,10 +92,8 @@ public class Server {
         String cmd = decoder.decode(buffer).toString();
         String[] subCmd = cmd.split(" ");
         // Removing \n
-        if(subCmd.length >= 2) subCmd[1] = subCmd[1].substring(0, subCmd[1].length() - 1);
-        else{
-            if(subCmd[0].length() >= 2) subCmd[0] = subCmd[0].substring(0, subCmd[0].length() - 1);
-        }
+        int l = subCmd.length;
+        subCmd[l-1] = subCmd[l-1].substring(0, subCmd[l-1].length() - 1);
         System.out.println("After: " + Arrays.toString(subCmd));
         System.out.println("Client State: <" + estado + "> " + estado.equals(state.OUTSIDE));
         switch (estado){
@@ -168,6 +167,17 @@ public class Server {
                         socketState.put(socketChannel, state.INSIDE);
                         socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
                         break;
+                    case "/priv":
+                        String emissor = clientName.get(socketChannel);
+                        SocketChannel recetorSoc = availableNames.get(subCmd[1]);
+                        if(recetorSoc == null){
+                            sendError(socketChannel);
+                            break;
+                        }
+                        String msg = getMessage(cmd);
+                        sendPrivMessage(recetorSoc, msg, emissor);
+                        socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
+                        break;
                     default:
                         sendError(socketChannel);
                         break;
@@ -201,6 +211,33 @@ public class Server {
                     case "/leave":
                         removeFromRoom(socketChannel);
                         break;
+                    case "/join":
+                        removeFromRoom(socketChannel);
+                        // Caso não seja possivel converter para inteiro o nº da sala
+                        int r;
+                        try {
+                            r = Integer.parseInt(subCmd[1]);
+                        } catch (NumberFormatException e) {
+                            sendError(socketChannel);
+                            return;
+                        }
+                        addToRoom(socketChannel, r);
+                        socketState.remove(socketChannel);
+                        socketState.put(socketChannel, state.INSIDE);
+                        break;
+                    case "/priv":
+                        String emissor = clientName.get(socketChannel);
+                        SocketChannel recetorSoc = availableNames.get(subCmd[1]);
+                        if(recetorSoc == null){
+                            sendError(socketChannel);
+                            break;
+                        }
+                        String msg = getMessage(cmd);
+                        sendPrivMessage(recetorSoc, msg, emissor);
+                        socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
+                        break;
+                    default:
+                        sendMessage(socketChannel, cmd);
                 }
                 break;
             default:
@@ -234,10 +271,10 @@ public class Server {
         clientRoom.remove(socketChannel);
         // Search for Socket in Room and remove it
         for(Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()){
-            Iterator<SocketChannel> it = e.getValue().iterator();
-            while(it.hasNext()){
-                if(it.next() == socketChannel)  it.remove();
-            }
+                Iterator<SocketChannel> it = e.getValue().iterator();
+                while (it.hasNext()) {
+                    if (it.next() == socketChannel) it.remove();
+                }
         }
         socketState.remove(socketChannel);
         socketChannel.write(encoder.encode(CharBuffer.wrap("BYE\n")));
@@ -246,9 +283,10 @@ public class Server {
 
     public static void removeFromRoom(SocketChannel socketChannel) throws IOException {
         // Catch null in case the user wasn't in a room
+        int r;
         try {
             //System.out.println("Getting in Removal " + clientRoom.toString());
-            int r = clientRoom.get(socketChannel);
+            r = clientRoom.get(socketChannel);
             //System.out.println("Room: " + r);
         }catch (NullPointerException e){
             return;
@@ -256,14 +294,16 @@ public class Server {
         String name = clientName.get(socketChannel);
         clientRoom.remove(socketChannel);
         for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
-            Iterator<SocketChannel> it = e.getValue().iterator();
-            while (it.hasNext()) {
-                SocketChannel s = it.next();
-                if(s == socketChannel){
-                    socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
-                    it.remove();
-                }else{
-                    s.write(encoder.encode(CharBuffer.wrap("LEFT " + name+"\n")));
+            if(e.getKey() == r) {
+                Iterator<SocketChannel> it = e.getValue().iterator();
+                while (it.hasNext()) {
+                    SocketChannel s = it.next();
+                    if (s == socketChannel) {
+                        socketChannel.write(encoder.encode(CharBuffer.wrap("OK\n")));
+                        it.remove();
+                    } else {
+                        s.write(encoder.encode(CharBuffer.wrap("LEFT " + name + "\n")));
+                    }
                 }
             }
         }
@@ -276,9 +316,11 @@ public class Server {
     public static void addToRoom(SocketChannel socketChannel, int r) throws IOException {
         String name = clientName.get(socketChannel);
         for(Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()){
-            Iterator<SocketChannel> it = e.getValue().iterator();
-            while(it.hasNext()){
-                    it.next().write(encoder.encode(CharBuffer.wrap("JOINED "+ name+"\n")));
+            if(e.getKey() == r) {
+                Iterator<SocketChannel> it = e.getValue().iterator();
+                while (it.hasNext()) {
+                    it.next().write(encoder.encode(CharBuffer.wrap("JOINED " + name + "\n")));
+                }
             }
         }
         room.computeIfAbsent(r, k -> new ArrayList<>()).add(socketChannel);
@@ -291,21 +333,69 @@ public class Server {
     }
 
     public static void warnChangeName(SocketChannel socketChannel, String OldName, String NewName) throws IOException {
+        int r;
         try {
             //System.out.println("Getting in Removal " + clientRoom.toString());
-            int r = clientRoom.get(socketChannel);
+            r = clientRoom.get(socketChannel);
             //System.out.println("Room: " + r);
         }catch (NullPointerException e){
             return;
         }
         for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
-            Iterator<SocketChannel> it = e.getValue().iterator();
-            while (it.hasNext()) {
-                SocketChannel s = it.next();
-                if(s == socketChannel) s.write(encoder.encode(CharBuffer.wrap("OK\n")));
-                else s.write(encoder.encode(CharBuffer.wrap("NEWNICK " + OldName + " "+ NewName + "\n")));
+            if(e.getKey() == r) {
+                Iterator<SocketChannel> it = e.getValue().iterator();
+                while (it.hasNext()) {
+                    SocketChannel s = it.next();
+                    if (s == socketChannel) s.write(encoder.encode(CharBuffer.wrap("OK\n")));
+                    else s.write(encoder.encode(CharBuffer.wrap("NEWNICK " + OldName + " " + NewName + "\n")));
+                }
             }
         }
 
     }
+
+    public static void sendMessage(SocketChannel socketChannel, String msg) throws IOException {
+        if(msg.charAt(0) == '/'){
+            sendError(socketChannel);
+            return;
+        }
+
+        int r;
+        try {
+            //System.out.println("Getting in Removal " + clientRoom.toString());
+            r = clientRoom.get(socketChannel);
+            //System.out.println("Room: " + r);
+        }catch (NullPointerException e){
+            return;
+        }
+
+        String name = clientName.get(socketChannel);
+
+        for (Map.Entry<Integer, List<SocketChannel>> e : room.entrySet()) {
+            if(e.getKey() == r) {
+                Iterator<SocketChannel> it = e.getValue().iterator();
+                while (it.hasNext()) {
+                    SocketChannel s = it.next();
+                    // Caso usemos interface gráfica, retirar o if
+                    if (s != socketChannel) s.write(encoder.encode(CharBuffer.wrap(name + ": " + msg)));
+                }
+            }
+        }
+
+    }
+
+    public static void sendPrivMessage(SocketChannel socketChannel, String msg, String emissor) throws IOException {
+        socketChannel.write(encoder.encode(CharBuffer.wrap("PRIVATE " + emissor + ": " + msg)));
+    }
+
+    public static String getMessage(String msg){
+        int count = 0, i;
+        for(i = 0; i < msg.length(); i++){
+            if(count == 2) break;
+            if(msg.charAt(i) == ' ') count++;
+        }
+        return msg.substring(i);
+    }
+
+
 }
