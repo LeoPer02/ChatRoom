@@ -373,8 +373,7 @@ public class Server {
 
     public static void sendMessage(SocketChannel socketChannel, String msg) throws IOException {
         if(msg.charAt(0) == '/'){
-            sendError(socketChannel);
-            return;
+            msg = msg.substring(1);
         }
 
         String r;
