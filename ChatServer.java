@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -16,7 +17,7 @@ enum state {
     INSIDE
 }
 
-public class Server {
+public class ChatServer {
 
     static private final Charset charset = StandardCharsets.UTF_8;
     static private final CharsetDecoder decoder = charset.newDecoder();
@@ -62,12 +63,61 @@ public class Server {
                     } else if(mykey.isReadable()) {
 
 
+                        SocketChannel sc = null;
 
-                        SocketChannel socketChannel = (SocketChannel) mykey.channel();
-                        commands(socketChannel);
+                        String msg = null;
+                        try {
+
+                            // It's incoming data on a connection -- process it
+                            sc = (SocketChannel) mykey.channel();
+                            msg = processInput(sc);
+
+                            // If the connection is dead, remove it from the selector
+                            // and close it
+                            if (msg == null) {
+                                mykey.cancel();
+
+                                Socket s = null;
+                                try {
+                                    s = sc.socket();
+                                    System.out.println("Closing connection to " + s);
+                                    String name = clientName.get(sc);
+                                    // Remove the entry of the Socket -> Name
+                                    clientName.remove(sc);
+                                    // Free Name
+                                    availableNames.remove(name);
+                                    // Remove entry Socket -> Room
+                                    clientRoom.remove(sc);
+                                    // Search for Socket in Room and remove it
+                                    for(Map.Entry<String, List<SocketChannel>> e : room.entrySet()){
+                                        Iterator<SocketChannel> it = e.getValue().iterator();
+                                        while (it.hasNext()) {
+                                            if (it.next() == sc) it.remove();
+                                        }
+                                    }
+                                    socketState.remove(sc);
+                                    s.close();
+                                } catch (IOException ie) {
+                                    System.err.println("Error closing socket " + s + ": " + ie);
+                                }
+                            }else commands(sc, msg);
+
+                        } catch (IOException ie) {
+
+                            // On exception, remove this channel from the selector
+                            mykey.cancel();
+
+                            try {
+                                sc.close();
+                            } catch (IOException ie2) {
+                                System.out.println(ie2);
+                            }
+
+                            System.out.println("Closed " + sc);
+                        }
 
 
-                     }
+                    }
                     selectionKeyIterator.remove();
                 }
             }
@@ -78,24 +128,36 @@ public class Server {
         }
     }
 
-    public static void commands(SocketChannel socketChannel) throws IOException {
+    // Just read the message from the socket and send it to stdout
+    static private String processInput( SocketChannel sc) throws IOException {
+        // Read the message to the buffer
         ByteBuffer buffer = ByteBuffer.allocate(1024);
-        socketChannel.read(buffer);
-        if (buffer.limit() == 0) {
-            sendError(socketChannel);
-            closeSocket(socketChannel);
-            return;
+        sc.read( buffer );
+        buffer.flip();
+
+        // If no data, close the connection
+        if (buffer.limit()==0) {
+            return null;
         }
 
-        state estado = checkState(socketChannel);
-        buffer.flip();
-        String cmd = decoder.decode(buffer).toString();
-        while(cmd.charAt(cmd.length()-1) != '\n'){
+        // Decode and print the message to stdout
+
+        String message = decoder.decode(buffer).toString();
+        while(message.charAt(message.length()-1) != '\n'){
             buffer.clear();
-            socketChannel.read(buffer);
+            sc.read(buffer);
             buffer.flip();
-            cmd += decoder.decode(buffer).toString();
+            message += decoder.decode(buffer).toString();
         }
+        System.out.print( message );
+
+        return message;
+    }
+
+    public static void commands(SocketChannel socketChannel, String msgs) throws IOException {
+
+        state estado = checkState(socketChannel);
+        String cmd = msgs;
         String[] subCmd = cmd.split(" ");
         // Removing \n
         int l = subCmd.length;
@@ -278,10 +340,10 @@ public class Server {
         clientRoom.remove(socketChannel);
         // Search for Socket in Room and remove it
         for(Map.Entry<String, List<SocketChannel>> e : room.entrySet()){
-                Iterator<SocketChannel> it = e.getValue().iterator();
-                while (it.hasNext()) {
-                    if (it.next() == socketChannel) it.remove();
-                }
+            Iterator<SocketChannel> it = e.getValue().iterator();
+            while (it.hasNext()) {
+                if (it.next() == socketChannel) it.remove();
+            }
         }
         socketState.remove(socketChannel);
         socketChannel.write(encoder.encode(CharBuffer.wrap("BYE\n")));
