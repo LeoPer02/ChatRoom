@@ -172,7 +172,8 @@ public class ChatServer {
                 switch (subCmd[0]){
                     // ---------------- NICK COMMAND -----------------
                     case "/nick":
-                        if(availableNames.get(subCmd[1]) == null){
+                        if(subCmd[1].length() < 1) sendError(socketChannel);
+                        else if(availableNames.get(subCmd[1]) == null){
                             clientName.put(socketChannel, subCmd[1]);
                             availableNames.put(subCmd[1], socketChannel);
                             CharBuffer msg = CharBuffer.wrap("OK\n");
@@ -200,7 +201,8 @@ public class ChatServer {
                     // ---------------- NICK COMMAND -----------------
                     case "/nick":
                         String name = clientName.get(socketChannel);
-                        if(name.equals(subCmd[1])){
+                        if(subCmd[1].length() < 1) sendError(socketChannel);
+                        else if(name.equals(subCmd[1])){
                             CharBuffer msg = CharBuffer.wrap("You already are logged as: " + subCmd[1] + "\n");
                             socketChannel.write(encoder.encode(msg));
                         }else if (availableNames.get(subCmd[1]) == null) {
@@ -222,6 +224,10 @@ public class ChatServer {
                         break;
                     // -------------- JOIN COMMAND ------------------
                     case "/join":
+                        if(subCmd[1].length() < 1) {
+                            sendError(socketChannel);
+                            break;
+                        }
                         removeFromRoom(socketChannel);
                         // Caso não seja possivel converter para inteiro o nº da sala
                         String r;
@@ -261,7 +267,8 @@ public class ChatServer {
                         break;
                     case "/nick":
                         String name = clientName.get(socketChannel);
-                        if(name.equals(subCmd[1])){
+                        if(subCmd[1].length() < 1) sendError(socketChannel);
+                        else if(name.equals(subCmd[1])){
                             CharBuffer msg = CharBuffer.wrap("You already are logged as: " + subCmd[1] + "\n");
                             socketChannel.write(encoder.encode(msg));
                         }else if (availableNames.get(subCmd[1]) == null) {
@@ -281,6 +288,10 @@ public class ChatServer {
                         removeFromRoom(socketChannel);
                         break;
                     case "/join":
+                        if(subCmd[1].length() < 1) {
+                            sendError(socketChannel);
+                            break;
+                        }
                         removeFromRoom(socketChannel);
                         // Caso não seja possivel converter para inteiro o nº da sala
                         String r;
