@@ -3,6 +3,10 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.util.*;
 
 
@@ -19,7 +23,6 @@ public class ChatClient {
     Socket socket;
     DataOutputStream dataOutputStream;
     BufferedReader bufferedReader;
-
     
     // Método a usar para acrescentar uma string à caixa de texto
     // * NÃO MODIFICAR *
@@ -76,11 +79,14 @@ public class ChatClient {
         String tmp[] = message.split(" ");
         System.out.println(tmp[0]);
         if(message.length() > 1 && message.charAt(0) == '/' && !Objects.equals(tmp[0], "/nick") && !Objects.equals(tmp[0], "/join") && !Objects.equals(tmp[0], "/leave") && !Objects.equals(tmp[0], "/bye") && !Objects.equals(tmp[0], "/priv")){
-            dataOutputStream.writeBytes("/" + message + "\n");
+            message = "/" + message + "\n";
+            dataOutputStream.write(message.getBytes());
+            //("/" + message + "\n");
             dataOutputStream.flush();
             if(Objects.equals(tmp[0], "/bye")) frame.dispose();
         }else{
-            dataOutputStream.writeBytes(message + "\n");
+            message += '\n';
+            dataOutputStream.write(message.getBytes());
             dataOutputStream.flush();
         }
     }

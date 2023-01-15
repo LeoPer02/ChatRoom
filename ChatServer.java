@@ -475,6 +475,4 @@ public class ChatServer {
         }
         return msg.substring(i);
     }
-
-
 }
