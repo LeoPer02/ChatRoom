@@ -100,7 +100,14 @@ public class ChatServer {
                                 } catch (IOException ie) {
                                     System.err.println("Error closing socket " + s + ": " + ie);
                                 }
-                            }else commands(sc, msg);
+                            }else{
+                                String[] msg2 = msg.split("\n");
+                                for(String s2 : msg2){
+                                    s2 += '\n';
+                                    commands(sc, s2); 
+                                } 
+                                //commands(sc, msg);
+                            } 
 
                         } catch (IOException ie) {
 
